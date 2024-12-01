@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Gateway</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>ESP32 Gateway with ESP32-CAM Stream</h1>
+    <img style="display: block;-webkit-user-select: none;margin: auto;background-color: hsl(0, 0%, 25%);" src="http://172.20.10.13/stream">
+
+    <h2>Realtime Audio Stream</h2>
+    <p>Playing audio from microphone...</p>
+
+    <script>
+        const sampleRate = 8000; // อัตรา Sampling ต้องตรงกับ ESP32
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const socket = new WebSocket("ws://" + location.hostname + ":81");
+        socket.binaryType = "arraybuffer";
+
+        // สร้าง Audio Buffer
+        socket.onmessage = function(event) {
+            console.log("Received audio data:", event.data.byteLength, "bytes"); // ตรวจสอบขนาดข้อมูลที่รับมา
+            const audioData = new Int16Array(event.data); // รับข้อมูลไบนารี
+            const audioBuffer = audioContext.createBuffer(1, audioData.length, sampleRate);
+            const channelData = audioBuffer.getChannelData(0);
+
+            // แปลงข้อมูลจาก Int16 เป็น Float32
+            for (let i = 0; i < audioData.length; i++) {
+                let value = audioData[i] / 2048; // แปลงค่าช่วง [-2048, 2048] เป็น [-1.0, 1.0]
+
+        // ตัด noise ด้วย Threshold
+                if (Math.abs(value) < 0.05) {
+                    value = 0; // ตั้งค่าเป็น 0 หาก noise ต่ำกว่าเกณฑ์
+                }
+
+                channelData[i] = value; // บันทึกค่าที่แปลงแล้ว
+            }
+
+            // เล่นเสียงผ่าน Web Audio API
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.start();
+        };
+
+        socket.onopen = function() {
+            console.log("WebSocket connected");
+        };
+
+        socket.onclose = function() {
+            console.log("WebSocket disconnected");
+        };
+    </script>
+</body>
+</html>
