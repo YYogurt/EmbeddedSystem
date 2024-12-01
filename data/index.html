@@ -42,7 +42,7 @@
                 let value = audioData[i] / 2048; // แปลงค่าช่วง [-2048, 2048] เป็น [-1.0, 1.0]
 
         // ตัด noise ด้วย Threshold
-                if (Math.abs(value) < 0.05) {
+                if (Math.abs(value) < 0.02) {
                     value = 0; // ตั้งค่าเป็น 0 หาก noise ต่ำกว่าเกณฑ์
                 }
 

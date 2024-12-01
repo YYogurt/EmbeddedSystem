@@ -29,13 +29,6 @@ AsyncWebServer server(80);
 WebSocketsServer webSocket(81);
 Audio audio;
 
-#define MIC_PIN 34
-#define SAMPLE_RATE 8000 // ความถี่ในการ Sampling 8kHz
-#define BUFFER_SIZE 128  // ขนาดบัฟเฟอร์สำหรับส่งข้อมูลเสียง
-
-int16_t audioBuffer[BUFFER_SIZE];
-
-
 #define I2S_DOUT 27 // ขา DIN ของ MAX98357A
 #define I2S_BCLK 26 // ขา BCLK ของ MAX98357A
 #define I2S_LRC 25  // ขา LRC ของ MAX98357A
@@ -153,36 +146,6 @@ bool hasPlayed = false; // สถานะการเล่นเสียง
     
 }
 
-void sampleAudio() {
-    const int smoothingWindow = 10; // ขนาดหน้าต่างการกรองแบบ Moving Average
-    int sum = 0;
-
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        int sample = analogRead(MIC_PIN) - 2048; // Normalize ค่าให้อยู่ตรงกลาง (0)
-
-        // กรอง Noise
-        if (abs(sample) < 50) { // ตัด Noise ที่ต่ำกว่า Threshold
-            sample = 0;
-        }
-
-        sum += sample;
-        if (i >= smoothingWindow) {
-            sum -= audioBuffer[i - smoothingWindow];
-        }
-
-        audioBuffer[i] = sum / smoothingWindow; // ค่าเฉลี่ยแบบ Moving Average
-    }
-
-    // Normalize & Gain Adjustment
-    int16_t maxVal = 0;
-    for (int i = 0; i < BUFFER_SIZE; i++) {
-        if (abs(audioBuffer[i]) > maxVal) {
-            maxVal = abs(audioBuffer[i]);
-        }
-    }
-}
-
-
 void loop() {
     if (Serial1.available()) { // ตรวจสอบว่ามีข้อมูลเข้ามาหรือไม่
         String receivedData = "";
@@ -202,6 +165,7 @@ void loop() {
             String jsonData = "{\"button\":" + String(buttonState) + "}";
             // เช็คสถานะปุ่มกด
             // Send data to the backend API
+
             if (buttonState == 0 && !hasPlayed) { // กดปุ่ม และยังไม่ได้เล่นเสียง
                 
                 Serial.println("Playing doorbell sound...");
@@ -216,9 +180,7 @@ void loop() {
         }
 
     }
-
-    sampleAudio(); // อ่านข้อมูลเสียง
-    webSocket.broadcastBIN((uint8_t*)audioBuffer, sizeof(audioBuffer)); // ส่งข้อมูลเสียงผ่าน WebSocket
+    
     webSocket.loop();
     audio.loop(); // ต้องเรียกใช้ใน loop() สำหรับเล่นเสียง
 }
